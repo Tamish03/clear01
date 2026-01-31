@@ -40,8 +40,10 @@ export async function POST(request: Request) {
 
     // 2. Call Gemini
     const aiResult = await model.generateContent(prompt);
-    const aiResponse = JSON.parse(aiResult.response.text());
-
+   // Replace your current parsing line with this:
+    const text = aiResult.response.text();
+    const cleanText = text.replace(/```json|```/g, "").trim(); // Removes potential markdown
+    const aiResponse = JSON.parse(cleanText);
     // 3. Log the real AI result to the database
     const newScan = await ScanRecordModel.create({
       userId: session.user._id,

@@ -5,12 +5,14 @@ declare module 'next-auth' {
   interface User {
     _id?: string;
     isVerified?: boolean;
+    verifycodeExpiry?: Date;
     username?: string;
   }
   interface Session {
     user: {
       _id?: string;
       isVerified?: boolean;
+      verifyCodeExpiry?: Date;
       username?: string;
     } & DefaultSession['user'];
   }
