@@ -5,4 +5,5 @@ export interface ApiResponse {
   message: string;
   isAcceptingMessages?: boolean; // Useful for later toggles
   scans?: Array<ScanRecord>;
+  whiteList?: string[]; // Add this to support whitelisting features
 }

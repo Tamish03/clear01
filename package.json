@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "build:extension": "tsc ../extension/content.ts ../extension/background.ts --outDir ../extension/dist --target es6 --module esNext --noEmitOnError"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

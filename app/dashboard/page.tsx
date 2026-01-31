@@ -1,83 +1,148 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
 import { ApiResponse } from '@/types/ApiResponse';
 
-export default function Dashboard() {
+export default function DashboardPage() {
   const { data: session } = useSession();
-  const [scans, setScans] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  
+  // State for Settings
+  const [settings, setSettings] = useState({
+    blurNSFW: true,
+    blurViolence: true,
+    blurScam: true,
+    blurHate: true,
+  });
 
+  // State for Whitelist
+  const [whiteList, setWhiteList] = useState<string[]>([]);
+  const [newDomain, setNewDomain] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+
+  // 1. Fetch all user data (Settings + Whitelist) on load
   useEffect(() => {
-    const fetchScans = async () => {
+    const fetchUserData = async () => {
       try {
-        const response = await fetch('/api/get-scans'); // We'll create this helper API next
+        const response = await fetch('/api/get-scans'); // Reusing your scan route or create a dedicated /api/user-data
         const data: ApiResponse = await response.json();
-        if (data.success && data.scans) {
-          setScans(data.scans);
+        // Assuming your user model now includes these fields
+        if (data.success) {
+          // If you create a dedicated user-data route, update these setters:
+          // setSettings(data.settings);
+          // setWhiteList(data.whiteList || []);
         }
       } catch (error) {
-        console.error('Failed to fetch scans', error);
-      } finally {
-        setIsLoading(false);
+        console.error("Failed to load user data", error);
       }
     };
-
-    if (session) fetchScans();
+    if (session) fetchUserData();
   }, [session]);
 
-  if (!session) return <div className="p-8">Please log in to view your dashboard.</div>;
+  // 2. Handle Setting Toggles
+  const toggleSetting = async (key: keyof typeof settings) => {
+    const updatedSettings = { ...settings, [key]: !settings[key] };
+    setSettings(updatedSettings);
+
+    await fetch('/api/update-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ settings: updatedSettings }),
+    });
+  };
+
+  // 3. Handle Whitelist Actions (Add/Remove)
+  const handleWhitelist = async (domain: string, action: 'add' | 'remove') => {
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/whitelist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ domain, action }),
+      });
+
+      const data: ApiResponse = await response.json();
+      if (data.success) {
+        setWhiteList(data.whiteList || []);
+        if (action === 'add') setNewDomain('');
+      }
+    } catch (error) {
+      console.error("Whitelist update failed", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
-      <header className="mb-8 flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-900">Safety Dashboard</h1>
-        <div className="text-sm bg-blue-100 text-blue-800 px-4 py-2 rounded-full font-medium">
-          Logged in as: {session.user.username}
-        </div>
-      </header>
+    <div className="min-h-screen bg-gray-950 text-white p-8">
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-3xl font-bold mb-8 text-blue-500">CLEAR Control Center</h1>
 
-      <div className="grid gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-xl font-semibold mb-4 text-gray-800">Recent Activity</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           
-          {isLoading ? (
-            <p className="text-gray-500">Loading your protection history...</p>
-          ) : scans.length === 0 ? (
-            <p className="text-gray-500 italic">No threats detected yet. The extension is working in the background!</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b text-gray-600 uppercase text-xs">
-                    <th className="py-3 px-4">URL</th>
-                    <th className="py-3 px-4">Category</th>
-                    <th className="py-3 px-4">Threat Level</th>
-                    <th className="py-3 px-4">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {scans.map((scan) => (
-                    <tr key={scan._id} className="border-b hover:bg-gray-50 transition">
-                      <td className="py-4 px-4 font-medium text-blue-600 truncate max-w-xs">{scan.url}</td>
-                      <td className="py-4 px-4 text-gray-600">{scan.category}</td>
-                      <td className="py-4 px-4">
-                        <span className={`px-2 py-1 rounded text-xs font-bold ${
-                          scan.threatLevel === 'high' ? 'bg-red-100 text-red-700' :
-                          scan.threatLevel === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-green-100 text-green-700'
-                        }`}>
-                          {scan.threatLevel.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="py-4 px-4 italic text-gray-500">{scan.actionTaken}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* LEFT: PROTECTION SETTINGS */}
+          <div className="p-6 bg-gray-900 border border-gray-800 rounded-xl shadow-lg">
+            <h2 className="text-xl font-semibold mb-6 flex items-center gap-2">
+              🛡️ Protection Settings
+            </h2>
+            <div className="space-y-4">
+              {Object.entries(settings).map(([key, value]) => (
+                <div key={key} className="flex items-center justify-between p-4 bg-gray-800/50 rounded-lg border border-gray-700">
+                  <span className="capitalize font-medium">{key.replace('blur', '')} Blurring</span>
+                  <button
+                    onClick={() => toggleSetting(key as keyof typeof settings)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${value ? 'bg-blue-600' : 'bg-gray-600'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${value ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+              ))}
             </div>
-          )}
+          </div>
+
+          {/* RIGHT: WHITELIST MANAGER */}
+          <div className="p-6 bg-gray-900 border border-gray-800 rounded-xl shadow-lg">
+            <h2 className="text-xl font-semibold mb-2 flex items-center gap-2">
+              ✅ Trusted Domains
+            </h2>
+            <p className="text-gray-400 text-sm mb-6">Whitelisted sites will never be blurred or scanned.</p>
+
+            <div className="flex gap-2 mb-6">
+              <input
+                type="text"
+                placeholder="e.g., youtube.com"
+                className="flex-1 bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 outline-none focus:border-blue-500"
+                value={newDomain}
+                onChange={(e) => setNewDomain(e.target.value.toLowerCase())}
+              />
+              <button
+                onClick={() => handleWhitelist(newDomain, 'add')}
+                disabled={isLoading || !newDomain}
+                className="bg-blue-600 hover:bg-blue-700 px-6 py-2 rounded-lg font-bold disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+
+            <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2">
+              {whiteList.length === 0 ? (
+                <p className="text-center text-gray-500 py-4 italic">No domains whitelisted yet.</p>
+              ) : (
+                whiteList.map((domain) => (
+                  <div key={domain} className="flex justify-between items-center p-3 bg-gray-800/30 border border-gray-700 rounded-lg group">
+                    <span className="text-gray-300">{domain}</span>
+                    <button
+                      onClick={() => handleWhitelist(domain, 'remove')}
+                      className="text-gray-500 hover:text-red-500 transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
